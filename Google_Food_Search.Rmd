@@ -1,0 +1,53 @@
+---
+title: "Google_Food_Search"
+output: html_document
+---
+
+## Package Setup
+```{r}
+ install.packages("dplyr", repos = "http://cran.us.r-project.org")
+ library(dplyr)
+```
+
+## Read Google_Food_Search dataset
+```{r}
+ searchData <- read.csv("seasonality-values-d2b9a3.csv")
+ dim(searchData) 
+```
+
+## Check for NA data
+```{r}
+ sum(is.na(searchData))
+```
+
+## Select 3 columns ('id','week_id','value') by removing 'googleTopic' column
+```{r}
+ searchList <- select(searchData, -googleTopic)
+ str(searchList)
+```
+
+## Rename 'id'&'week_id' columns to 'food'&'week' columns
+```{r}
+ searchList <- rename(searchList, food=id, week=week_id)
+ str(searchList)
+```
+
+## Mutate a new 'year' column to the searchList df
+```{r}
+ searchList <- mutate(searchList, year=(as.numeric(strtrim(searchList$week,4))))
+ str(searchList)
+```
+
+## Arrange searchList in ascending order by 'food' & 'week' columns
+```{r}
+ searchList <- arrange(searchList, food, week)
+ str(searchList)
+```
+
+## Filter SearchList df to summarize 'Apple' search by year
+```{r}
+ filter(searchList,food=="apple") %>%
+ group_by(year)                   %>%
+ summarize(count=sum(value))      %>%
+ print
+```
