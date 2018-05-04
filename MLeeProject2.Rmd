@@ -1,0 +1,166 @@
+---
+title: "MLee Project 2 on Google_Food_Search dataset"
+output: html_document
+---
+
+## Package and Library Setup
+```{r}
+ install.packages("dplyr", repos = "http://cran.us.r-project.org")
+ install.packages("tidyr")
+ install.packages("ggplot2")
+ 
+ library(dplyr)
+ library(tidyr)
+ library(ggplot2)
+
+```
+
+## Read Google_Food_Search dataset
+```{r}
+ dataset <- read.csv("seasonality-values-d2b9a3.csv")
+ str(dataset)
+```
+
+## Parse 'week_id' column into 'year' & 'week' columns
+```{r}
+
+ dataset <- dataset %>% separate(week_id, c("year", "week"))
+ dataset$year <- as.integer(dataset$year)
+ dataset$week <- as.integer(dataset$week)
+ str(dataset)
+
+```
+
+## Plot the trend for total search for 2004-2016
+```{r}
+
+ plotData1 <- dataset            %>%
+ group_by(year)                  %>%
+ summarize(count=sum(value))
+
+ g1 <- ggplot(plotData1,aes(year,count))                        +
+       geom_point(color="grey",size=4,alpha=1/2)                +
+       geom_smooth(se=FALSE,method='loess')                     +
+       labs(x="Year",y="Count")                                 +
+       labs(title="Total Google Food Search from 2004 to 2016") +
+       labs(subtitle="   Search Volume Doubles as Internet Accessiblility Increases")
+ g1            
+
+```
+
+## Filter 2 food items from dataset
+##    Avocado   - all year round super food
+##    Ice Cream - seasonal food
+## Add 3 new columns(mon,qtr,monCount) to foodData
+```{r}
+ 
+ foodData <- dataset %>%
+             filter(id %in% c('avocado','ice-cream') )
+ 
+ foodData <- mutate(foodData, qtr = as.factor (
+             quarters( as.Date(
+             paste("1",foodData$week,foodData$year,sep="-"),
+             format="%w-%W-%Y") ) ) )
+ 
+ foodData <- mutate(foodData, mon = match( months( as.Date(
+             paste("1",foodData$week,foodData$year,sep="-"),
+             format="%w-%W-%Y") ) ,month.name) )
+   
+ foodData <- mutate(foodData,monCount=NA)
+ str(foodData)
+  
+```
+
+## Compute monthly count 'monCount' from weekly count 'value' 
+```{r}
+
+ maxRow <- dim(foodData)[1]
+ i <-1
+ while (i <= maxRow) {
+   foodData[i,8] <- foodData[i,5]   + foodData[i+1,5] +
+                    foodData[i+2,5] + foodData[i+3,5]
+   if ( i+4 > maxRow) break()
+   if ( foodData[i,7] == foodData[i+4,7] ) {
+          foodData[i,8] <- foodData[i  ,8] +
+                           foodData[i+4,5]
+          i <- i+1
+   }
+   i <- i+4
+ } # end While loop
+ 
+```
+
+## Delete 'value' column & keep rows with valid 'monCount'
+```{r}
+
+ sum(is.na(foodData))
+ foodData <- select(foodData, -value)
+ foodData <- na.omit(foodData)
+ maxRow   <- dim(foodData)[1]
+ 
+```
+
+## Extract super food (avocado) from foodData
+## Plot yearly trend
+```{r}
+
+ superFood <- foodData %>% filter(id %in% c('avocado'))
+
+ plotData2 <- superFood           %>%
+ group_by(year)                   %>%
+ summarize(count=sum(monCount))
+  
+ g2 <- ggplot(plotData2,aes(year,count))                    +
+       geom_point(color="green",size=4,alpha=1/2)           +
+       geom_smooth(size=2,se=FALSE,method="loess")          +
+       labs(x="Year",y="Count")                             +
+       labs(subtitle="  Search Volume Increased 5 Folds ")  +
+ labs(title="Google Search on Super Food Avocado  (2004-2016)")
+ g2
+ 
+```
+
+## Plot avocado search quarterly trend
+```{r}
+
+ g3 <- ggplot(superFood,aes(qtr,monCount))                    +
+       geom_boxplot(fill="green",size=1)                      +
+       labs(x="Quarters",y="Count")                           +
+ labs(title="Google Search on Super Food Avocado (2004-2016)")+
+ labs(subtitle="  Year Round Item - limited volume changes from seasons")
+ g3
+ 
+```
+
+## Extract seasonal food (ice cream) from foodData
+## Plot yearly trend
+```{r}
+
+ seasonalFood <- foodData %>% filter(id %in% c('ice-cream'))
+
+ plotData4 <- seasonalFood         %>%
+ group_by(year)                    %>%
+ summarize(count=sum(monCount))
+  
+ g4 <- ggplot(plotData2,aes(year,count))                    +
+       geom_point(color="purple",size=4,alpha=1/2)          +
+       geom_smooth(size=2,se=FALSE,method="loess")          +
+       labs(x="Year",y="Count")                             +
+       labs(title="Google Search on Ice Cream (2004-2016)") +
+       labs(subtitle="   Search Volume Increased 3 Folds ")
+ g4
+ 
+```
+
+## Plot ice cream quarterly trend
+```{r}
+
+ g5 <- ggplot(seasonalFood,aes(qtr,monCount))               +
+       geom_boxplot(fill="purple",size=1)                   +
+       coord_cartesian(ylim=c(0,125))                       +
+       labs(x="Quarters",y="Count")                         +
+       labs(title="Google  Search on Ice Cream (2004-2016)")+
+ labs(subtitle="   Seasonal Item - search doubles in warmer seasons")
+ g5
+ 
+```
