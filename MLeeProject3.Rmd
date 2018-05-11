@@ -1,0 +1,189 @@
+---
+title: "MLee Project 3 on t-Test on sample"
+output: html_document
+---
+
+## Set up population myData dataframe DF
+##        by reusing code from Project #2 (line 9-76 below)
+
+## Package and Library Setup
+```{r}
+ install.packages("dplyr", repos = "http://cran.us.r-project.org")
+ install.packages("tidyr")
+ install.packages("ggplot2")
+ 
+ library(dplyr)
+ library(tidyr)
+ library(ggplot2)
+```
+
+## Read Google_Food_Search dataset
+```{r}
+ dataset <- read.csv("seasonality-values-d2b9a3.csv")
+ str (dataset)
+```
+
+## Parse 'week_id' column into 'year' & 'week' columns
+```{r}
+
+ dataset <- dataset %>% separate(week_id, c("year", "week"))
+ dataset$year <- as.integer(dataset$year)
+ dataset$week <- as.integer(dataset$week)
+ str(dataset)
+
+```
+
+## Filter 2 food items from dataset
+##    Avocado   - all year round super food
+##    Ice Cream - seasonal food
+## Add 3 new columns(qtr,mon,monCount) to foodData
+```{r}
+ 
+ foodData <- dataset %>%
+             filter(id %in% c('avocado','ice-cream') )
+ 
+ foodData <- mutate(foodData, qtr = as.factor (
+             quarters( as.Date(
+             paste("1",foodData$week,foodData$year,sep="-"),
+             format="%w-%W-%Y") ) ) )
+ 
+ foodData <- mutate(foodData, mon = match( months( as.Date(
+             paste("1",foodData$week,foodData$year,sep="-"),
+             format="%w-%W-%Y") ) ,month.name) )
+   
+ foodData <- mutate(foodData,monCount=NA)
+ str(foodData)
+  
+```
+
+## Compute monthly count 'monCount' from weekly count 'value' 
+```{r}
+
+ maxRow <- dim(foodData)[1]
+ i <-1
+ while (i <= maxRow) {
+   foodData[i,8] <- foodData[i,5]   + foodData[i+1,5] +
+                    foodData[i+2,5] + foodData[i+3,5]
+   if ( i+4 > maxRow) break()
+   if ( foodData[i,7] == foodData[i+4,7] ) {
+          foodData[i,8] <- foodData[i  ,8] +
+                           foodData[i+4,5]
+          i <- i+1
+   }
+   i <- i+4
+ } # end While loop
+ 
+```
+
+## Project #3 code starts here
+## Load myData dataframe for data analysis
+```{r}
+
+ myData <- select(foodData, id, monCount)  %>%
+           na.omit                         %>%
+           droplevels()
+     ## keep rows with valid 'monCount'
+ row.names(myData) <- 1:nrow(myData)
+     ## Reset index after removing NA rows from foodData
+ myData
+
+```
+
+## Random Sampling
+## Get a random sample from the population myData df
+```{r}
+
+ n <- 30
+ s_row_nums <- sample(1:nrow(myData), n)
+ s_myData   <- myData[s_row_nums,]
+ s_myData
+ 
+```
+
+## Test #1: Use t-test on monCount of the sample s_myData
+```{r}
+
+  s_monCount <- s_myData$monCount
+  t.test(s_monCount)
+      ## sample mean (X_mean) & the confidence interval (CI)
+  CI_lower <- t.test(s_monCount)$conf.int[1]
+  CI_upper <- t.test(s_monCount)$conf.int[2]
+  p_value  <- t.test(s_monCount)$p.value
+  
+  cat ("  This 30 sample has...")   %>%   print()
+  
+  table(s_myData$id)
+      ## show # of avocado & ice-cream in this sample of 30
+
+  mu_myData <- mean(myData$monCount)
+      ## compute the mean of population
+  
+  if ( (mu_myData >= CI_lower) & (mu_myData <= CI_upper) ) {
+     cat("\n  Accept the t-test -- population mean mu ",
+         mu_myData," is \n  within the confidence interval: ",
+         CI_lower,"-",CI_upper,".     ")   %>%
+     print()
+  } else if (p_value < 0.05) {
+     cat("\n  Reject based on small p-value of "
+         ,p_value," < 0.05.\n")            %>%
+     cat("\n  Reject t-test since mean_X is outside the CI ",
+         "interval &\n small p-value of ", p_value,
+         " < 0.05.     ")                  %>%
+     print()
+  } else print("\n   Reject t-test -- mu outside CI range.     ")
+  
+```
+
+## Compute the mean of sample for avocado & ice cream
+```{r}
+
+  s_myData_id  <-   s_myData  %>%  group_by(id)
+  s_myData_id  %>%  summarize(mean(monCount))
+  
+```
+ 
+## Let us do a t-test of the difference of means. The Null hyposthesis is that there is no difference (Xmean-Ymean=0)
+```{r}
+
+ avocado   <- s_myData                  %>%
+              filter(id=="avocado")     %>%
+              select(monCount)
+ 
+ ice_cream <- s_myData                  %>%
+              filter(id=="ice-cream")   %>%
+              select(monCount)
+ 
+ t.test(avocado,ice_cream)
+
+ ## Check if difference in mean of zero is in the CI
+ ## Check if p_value is less than 0.05
+ 
+  CI_lower <- t.test(avocado,ice_cream)$conf.int[1]
+  CI_upper <- t.test(avocado,ice_cream)$conf.int[2]
+  p_value  <- t.test(avocado,ice_cream)$p.value
+ 
+  cat("  Accept or reject the null hyposthesis?     ")   %>%
+  print()
+ 
+  if ( (0 >= CI_lower) & (0 <= CI_upper) ) {
+     cat("\n  Accept the null hypothesis based difference ",
+         "mean of zero is within \n   the confidence interval: ",
+         CI_lower, " - ", CI_upper,".     ")       %>%
+     print()
+  } else if (p_value < 0.05) {
+     cat("\n  Reject the null hypothesis since 0 is outside the ",
+         "confidence \n  interval & small p-value of ", 
+         p_value," < 0.05.     ")                  %>%
+     print()
+  } else print("\n  Reject the null hypothesis -- ",
+               " zero is outside CI range.     ")
+
+```
+
+## Population: difference of means
+```{r}
+
+ myData_id  <-   myData  %>%  group_by(id)
+ myData_id  %>%  summarize(mean(monCount))
+ 
+```
